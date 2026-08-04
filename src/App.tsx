@@ -42,6 +42,7 @@ function Metric({ label, value, copy, icon: Icon }: { label: string; value: stri
 
 function Auth() {
   const [mode, setMode] = useState<'sign-in' | 'create'>('sign-in')
+  const [recoveryMode, setRecoveryMode] = useState(false)
   const [message, setMessage] = useState('')
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -50,8 +51,14 @@ function Auth() {
     const name = String(form.get('name') || '').trim()
     const email = String(form.get('email') || '').trim().toLowerCase()
     const password = String(form.get('password') || '')
-    if (!email || !password || (mode === 'create' && !name)) return setMessage('Please complete every required field.')
+    if (!email || (!recoveryMode && !password) || (mode === 'create' && !name)) return setMessage('Please complete every required field.')
     if (!supabase) return setMessage('Supabase is not configured. Add the VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY values first.')
+    if (recoveryMode) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname })
+      if (error) return setMessage(error.message)
+      setMessage('If that email has an account, a password reset link has been sent.')
+      return
+    }
     if (mode === 'create') {
       const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
       if (error) return setMessage(error.message)
@@ -62,7 +69,23 @@ function Auth() {
     if (error) setMessage(error.message)
   }
 
-  return <main className="auth-shell"><section className="auth-showcase"><div className="brand"><div className="brand-mark">A</div><div><strong>Team Andeng</strong><span>FIRST GLOBAL SUMMIT</span></div></div><div><p className="eyebrow">TEAM OPERATIONS, MADE CLEAR</p><h1>Build people.<br /><em>Move purpose.</em></h1><p>One clean workspace for your agency’s people, production, pipeline, resources, and momentum.</p></div><div className="auth-circles"><i /><i /><i /></div></section><section className="auth-card-wrap"><form className="auth-card" onSubmit={submit}><div className="auth-icon"><ShieldCheck size={23} /></div><p className="eyebrow">TEAM ANDENG HQ</p><h2>{mode === 'sign-in' ? 'Welcome back' : 'Create your workspace account'}</h2><p className="auth-copy">{mode === 'sign-in' ? 'Sign in to continue to your dashboard.' : 'New accounts are advisors by default. An administrator assigns admin access securely in Supabase.'}</p>{mode === 'create' && <label>Full name<input name="name" placeholder="e.g. Andeng Santos" autoComplete="name" /></label>}<label>Email address<input name="email" type="email" placeholder="you@example.com" autoComplete="email" /></label><label>Password<input name="password" type="password" placeholder="Minimum 6 characters" minLength={6} autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'} /></label>{message && <p className="form-message">{message}</p>}<button className="primary-button submit-button" type="submit">{mode === 'sign-in' ? 'Sign in' : 'Create account'} <ChevronRight size={17} /></button><button type="button" className="auth-switch" onClick={() => { setMode(mode === 'sign-in' ? 'create' : 'sign-in'); setMessage('') }}>{mode === 'sign-in' ? 'Need an account? Create one' : 'Already have an account? Sign in'}</button></form></section></main>
+  return <main className="auth-shell"><section className="auth-showcase"><div className="brand"><div className="brand-mark">A</div><div><strong>Team Andeng</strong><span>FIRST GLOBAL SUMMIT</span></div></div><div><p className="eyebrow">TEAM OPERATIONS, MADE CLEAR</p><h1>Build people.<br /><em>Move purpose.</em></h1><p>One clean workspace for your agency’s people, production, pipeline, resources, and momentum.</p></div><div className="auth-circles"><i /><i /><i /></div></section><section className="auth-card-wrap"><form className="auth-card" onSubmit={submit}><div className="auth-icon"><ShieldCheck size={23} /></div><p className="eyebrow">TEAM ANDENG HQ</p><h2>{recoveryMode ? 'Reset your password' : mode === 'sign-in' ? 'Welcome back' : 'Create your workspace account'}</h2><p className="auth-copy">{recoveryMode ? 'Enter your email and we will send a secure password reset link.' : mode === 'sign-in' ? 'Sign in to continue to your dashboard.' : 'New accounts are advisors by default. An administrator assigns admin access securely in Supabase.'}</p>{mode === 'create' && !recoveryMode && <label>Full name<input name="name" placeholder="e.g. Andeng Santos" autoComplete="name" /></label>}<label>Email address<input name="email" type="email" placeholder="you@example.com" autoComplete="email" /></label>{!recoveryMode && <label>Password<input name="password" type="password" placeholder="Minimum 6 characters" minLength={6} autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'} /></label>}{message && <p className="form-message">{message}</p>}<button className="primary-button submit-button" type="submit">{recoveryMode ? 'Send reset link' : mode === 'sign-in' ? 'Sign in' : 'Create account'} <ChevronRight size={17} /></button>{mode === 'sign-in' && !recoveryMode && <button type="button" className="auth-switch" onClick={() => { setRecoveryMode(true); setMessage('') }}>Forgot password?</button>}<button type="button" className="auth-switch" onClick={() => { setRecoveryMode(false); setMode(mode === 'sign-in' ? 'create' : 'sign-in'); setMessage('') }}>{recoveryMode ? 'Back to sign in' : mode === 'sign-in' ? 'Need an account? Create one' : 'Already have an account? Sign in'}</button></form></section></main>
+}
+
+function ResetPassword() {
+  const [message, setMessage] = useState('')
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const password = String(new FormData(event.currentTarget).get('password') || '')
+    if (password.length < 6) return setMessage('Use a password with at least 6 characters.')
+    if (!supabase) return setMessage('Supabase is not configured.')
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) return setMessage(error.message)
+    setMessage('Password updated. You can now sign in with your new password.')
+  }
+
+  return <main className="auth-shell"><section className="auth-showcase"><div className="brand"><div className="brand-mark">A</div><div><strong>Team Andeng</strong><span>FIRST GLOBAL SUMMIT</span></div></div><div><p className="eyebrow">ACCOUNT RECOVERY</p><h1>Choose a new<br /><em>password.</em></h1></div><div className="auth-circles"><i /><i /><i /></div></section><section className="auth-card-wrap"><form className="auth-card" onSubmit={submit}><div className="auth-icon"><ShieldCheck size={23} /></div><p className="eyebrow">TEAM ANDENG HQ</p><h2>Set a new password</h2><p className="auth-copy">Use at least 6 characters and keep it private.</p><label>New password<input name="password" type="password" placeholder="Minimum 6 characters" minLength={6} autoComplete="new-password" required /></label>{message && <p className="form-message">{message}</p>}<button className="primary-button submit-button" type="submit">Update password <ChevronRight size={17} /></button></form></section></main>
 }
 
 function App() {
@@ -70,6 +93,7 @@ function App() {
   const [data, setData] = useState<DataStore>(initialData)
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(initialSettings)
   const [currentUser, setCurrentUser] = useState<Account | null>(null)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('Overview')
   const [modal, setModal] = useState<'sale' | 'recruit' | 'resource' | 'event' | 'account' | null>(null)
@@ -114,7 +138,8 @@ function App() {
       setLoading(false)
     }
     void initialize()
-    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setLoading(false); return }
       if (!session?.user) { setCurrentUser(null); setAccounts([]); setData(initialData); return }
       void loadWorkspace(session.user.id, session.user.email || '')
     })
@@ -154,6 +179,7 @@ function App() {
 
   if (loading) return <main className="auth-shell"><p className="auth-copy">Loading workspace…</p></main>
   if (!isSupabaseConfigured) return <Auth />
+  if (passwordRecovery) return <ResetPassword />
   if (!currentUser) return <Auth />
 
   const tabItems = nav.filter(item => !item.admin || isAdmin)
