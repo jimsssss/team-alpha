@@ -103,6 +103,11 @@ function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [notice, setNotice] = useState('')
 
+  useEffect(() => {
+    const pageName = passwordRecovery ? 'Reset password' : currentUser ? activeTab : 'Sign in'
+    document.title = `${pageName} | ${workspaceSettings.teamName}`
+  }, [activeTab, currentUser, passwordRecovery, workspaceSettings.teamName])
+
   const loadWorkspace = async (userId: string, email: string) => {
     if (!supabase) return
     const [{ data: profile }, { data: profiles }, { data: sales }, { data: recruits }, { data: resources }, { data: events }, { data: workspace }] = await Promise.all([
